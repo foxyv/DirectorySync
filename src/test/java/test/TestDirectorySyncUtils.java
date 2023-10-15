@@ -1,5 +1,6 @@
 package test;
 
+import ninja.foxyv.vsync.entities.DirectoryFingerprint;
 import ninja.foxyv.vsync.entities.FileFingerprint;
 import ninja.foxyv.vsync.utils.DirectorySyncUtils;
 import org.junit.jupiter.api.Assertions;
@@ -11,19 +12,32 @@ import reactor.core.publisher.Timed;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Optional;
-import java.util.zip.Adler32;
-import java.util.zip.CRC32;
-import java.util.zip.CRC32C;
-import java.util.zip.Checksum;
 
 import static test.utils.TmpDirectoryUtils.prepareTMPDirectory;
 
 public class TestDirectorySyncUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TestDirectorySyncUtils.class);
+
+    @Test
+    public void testFingerprintDirectory() {
+        File tmp = new File("tmp");
+        prepareTMPDirectory(tmp);
+
+        DirectoryFingerprint directoryFingerprint = DirectorySyncUtils.fingerprintDirectory(tmp).block();
+        Assertions.assertNotNull(directoryFingerprint);
+        Assertions.assertEquals("tmp", directoryFingerprint.directoryName());
+        Assertions.assertNotNull(directoryFingerprint.hash());
+        Assertions.assertEquals(256 / 8, directoryFingerprint.hash().value().length);
+
+        // Check for idempotence
+        DirectoryFingerprint directoryFingerprint2 = DirectorySyncUtils.fingerprintDirectory(tmp).block();
+        Assertions.assertNotNull(directoryFingerprint2);
+        Assertions.assertNotNull(directoryFingerprint2.hash());
+        Assertions.assertArrayEquals(directoryFingerprint.hash().value(), directoryFingerprint2.hash().value(), "Directory hash changed after 2nd invocation.");
+
+    }
 
     @Test
     public void test() throws NoSuchAlgorithmException {
@@ -37,24 +51,22 @@ public class TestDirectorySyncUtils {
 
         FileFingerprint fingerprint = result.get();
 
-        CRC32 expectedcrc32 = checksum(mobyDick, new CRC32());
-        CRC32C expectedCRC32C = checksum(mobyDick, new CRC32C());
-        Adler32 expectedAdler32 = checksum(mobyDick, new Adler32());
-        byte[] sha1 = sha1(mobyDick);
+        byte[] sha256 = sha256(mobyDick);
 
         Assertions.assertNotNull(fingerprint);
-        Assertions.assertNotNull(fingerprint.crc32());
         Assertions.assertEquals(mobyDick.length(), fingerprint.length());
-        Assertions.assertEquals(expectedcrc32.getValue(), fingerprint.crc32().getValue());
-        Assertions.assertEquals(expectedCRC32C.getValue(), fingerprint.crc32C().getValue());
-        Assertions.assertEquals(expectedAdler32.getValue(), fingerprint.adler32().getValue());
-        Assertions.assertArrayEquals(sha1, fingerprint.sha1());
+        Assertions.assertArrayEquals(sha256, fingerprint.sha256().value());
 
         LOG.info("Fingerprinted " + result.get().length() + " bytes in " + result.elapsed().toMillis() + " milliseconds and " + result.elapsed().toNanosPart() + " nanos.");
+
+        FileFingerprint fingerprint2 = DirectorySyncUtils.fingerprintFile(mobyDick, 1024).block();
+        Assertions.assertNotNull(fingerprint2);
+        Assertions.assertEquals(fingerprint.length(), fingerprint2.length());
+        Assertions.assertArrayEquals(fingerprint.sha256().value(), fingerprint2.sha256().value());
     }
 
-    private byte[] sha1(File mobyDick) throws NoSuchAlgorithmException {
-        MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
+    private byte[] sha256(File mobyDick) throws NoSuchAlgorithmException {
+        MessageDigest sha1 = MessageDigest.getInstance("SHA-256");
         try(FileInputStream fis = new FileInputStream(mobyDick)) {
             int numRead;
             byte[] buffer = new byte[1024];
@@ -67,23 +79,5 @@ public class TestDirectorySyncUtils {
         }
     }
 
-
-    private static <T extends Checksum> T checksum(File aFile, T checksum) {
-        if (aFile == null || !aFile.isFile()) {
-            throw new RuntimeException("FOXE-4262080697766779427 - File is not a file: " + Optional.ofNullable(aFile).map(File::getAbsolutePath).orElse("null"));
-        }
-
-        try(FileInputStream fis = new FileInputStream(aFile)) {
-            int numRead;
-            byte[] buffer = new byte[256];
-            while((numRead = fis.read(buffer)) != -1) {
-                ByteBuffer bb = ByteBuffer.wrap(buffer, 0, numRead);
-                checksum.update(bb);
-            }
-            return checksum;
-        } catch (IOException e) {
-            throw new RuntimeException("FOXE-1479317106517931203 - Could not read from test file: " + aFile.getAbsolutePath(), e);
-        }
-    }
 
 }

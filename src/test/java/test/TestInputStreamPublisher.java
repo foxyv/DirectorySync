@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.concurrent.ExecutionException;
 
 import static test.utils.TmpDirectoryUtils.prepareTMPDirectory;
 
@@ -15,7 +14,7 @@ public class TestInputStreamPublisher {
     private static final Logger LOG = LoggerFactory.getLogger(TestInputStreamPublisher.class);
 
     @Test
-    public void test() throws ExecutionException, InterruptedException, IOException {
+    public void test() throws IOException {
         File tmp = new File("tmp");
         prepareTMPDirectory(tmp);
 

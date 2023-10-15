@@ -24,7 +24,7 @@ public class InputStreamFlux extends Flux<ByteBuffer> {
     final InputStream is;
     final int bufferSize;
 
-    AtomicBoolean subscribed = new AtomicBoolean(false);
+    final AtomicBoolean subscribed = new AtomicBoolean(false);
 
     public static Flux<ByteBuffer> flux(InputStream is) {
         return new InputStreamFlux(is);
