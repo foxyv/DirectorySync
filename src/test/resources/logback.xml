@@ -5,6 +5,7 @@
         </encoder>
     </appender>
 
+    <logger level="info" name="reactor.util.Loggers"/>
     <root level="debug">
         <appender-ref ref="STDOUT" />
     </root>

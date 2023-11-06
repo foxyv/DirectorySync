@@ -1,16 +1,15 @@
 package ninja.foxyv.vsync.react.fs;
 
 import ninja.foxyv.vsync.entities.FileFingerprint;
-import ninja.foxyv.vsync.entities.SHA256Hash;
-import ninja.foxyv.vsync.utils.DigestUtils;
 import reactor.core.CoreSubscriber;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.nio.ByteBuffer;
-import java.security.MessageDigest;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.zip.CRC32C;
+import java.util.zip.Checksum;
 
 /**
  * The classic reduce, collect, and other flat map methods of converting a flux to a mono are not really compatible with
@@ -22,7 +21,7 @@ public class FingerprintMono extends Mono<FileFingerprint> {
     final CompletableFuture<FileFingerprint> future = new CompletableFuture<>();
     final Flux<ByteBuffer> fileBytesFlux;
     final AtomicLong totalLength = new AtomicLong();
-    final MessageDigest sha256;
+    final Checksum checksum;
 
     public static FingerprintMono fromFileBytesFlux(String filename, Flux<ByteBuffer> fileBytesFlux) {
         return new FingerprintMono(filename, fileBytesFlux);
@@ -31,7 +30,7 @@ public class FingerprintMono extends Mono<FileFingerprint> {
     private FingerprintMono(String filename, Flux<ByteBuffer> fileBytesFlux) {
         this.filename = filename;
         this.fileBytesFlux = fileBytesFlux;
-        this.sha256 = DigestUtils.sha256();
+        this.checksum = new CRC32C();
     }
 
 
@@ -43,7 +42,7 @@ public class FingerprintMono extends Mono<FileFingerprint> {
                 .subscribe(buffer -> {
                     // Subscribe to the flux to iterate across the chunks of data from the file and update our checksums
                     this.totalLength.getAndAdd(buffer.remaining());
-                    this.sha256.update(buffer.array(), buffer.arrayOffset(), buffer.remaining());
+                    this.checksum.update(buffer.array(), buffer.arrayOffset(), buffer.remaining());
                 });
 
         // Use the completable future to wait for the result
@@ -55,6 +54,6 @@ public class FingerprintMono extends Mono<FileFingerprint> {
     }
 
     public void complete() {
-        future.complete(new FileFingerprint(filename, new SHA256Hash(sha256.digest()), this.totalLength.get()));
+        future.complete(new FileFingerprint(filename, this.checksum, this.totalLength.get()));
     }
 }

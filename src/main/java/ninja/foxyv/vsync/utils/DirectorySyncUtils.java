@@ -63,7 +63,7 @@ public class DirectorySyncUtils {
                 .sorted(Comparator.comparing(FileFingerprint::filename))
                 .forEach(fingerprint -> {
                     sha256.update(fingerprint.filename().getBytes(StandardCharsets.UTF_16));
-                    sha256.update(fingerprint.sha256().value());
+                    sha256.update(("" + fingerprint.checksum().getValue()).getBytes(StandardCharsets.UTF_8));
                 });
 
         return new DirectoryFingerprint(name, new SHA256Hash(sha256.digest()));

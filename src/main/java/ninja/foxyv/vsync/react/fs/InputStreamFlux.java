@@ -65,6 +65,12 @@ public class InputStreamFlux extends Flux<ByteBuffer> {
                 totalRead += numRead;
             }
             LOG.debug("Completed reading " + totalRead + " bytes of data from input stream.");
+
+            // For empty files we need to emit an empty buffer
+            if(totalRead == 0) {
+                subscriber.onNext(ByteBuffer.allocate(0));
+            }
+
             // Need to use this rather than subscriber.onComplete() to terminate the flux properly
             Operators.complete(subscriber);
         } catch (IOException e) {

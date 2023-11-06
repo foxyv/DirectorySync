@@ -18,12 +18,12 @@ public class TmpDirectoryUtils {
             LOG.info("Creating temporary directory: " + tmp.getAbsolutePath());
         }
 
-        copyClasspathFileTo("TMP_README.md", tmp);
-        copyClasspathFileTo("MobyDick.txt", tmp);
+        copyClasspathFileTo("files/TMP_README.md", tmp);
+        copyClasspathFileTo("files/MobyDick.txt", tmp);
     }
 
     public static void copyClasspathFileTo(String classpath, File tmp) {
-        File target = new File(tmp, classpath);
+        File target = new File(tmp, classpathFilename(classpath));
         if (target.exists()) {
             LOG.info("File has already been copied: " + classpath);
             return;
@@ -40,5 +40,11 @@ public class TmpDirectoryUtils {
         } catch (IOException e) {
             throw new RuntimeException("FOXE-5262996920082214375 - Could not copy test file to: " + target.getAbsolutePath(), e);
         }
+    }
+
+    public static String classpathFilename(String classpath) {
+        // Split by forward slash and return the last value
+        String[] split = classpath.split("/");
+        return split[split.length - 1];
     }
 }

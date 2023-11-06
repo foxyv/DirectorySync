@@ -18,7 +18,7 @@ public class TestInputStreamPublisher {
         File tmp = new File("tmp");
         prepareTMPDirectory(tmp);
 
-        File mobyDick = new File(tmp, "MobyDick.txt");
+        File mobyDick = new File(tmp, "files/MobyDick.txt");
 
         String mobyDickText;
         try (InputStream is = new FileInputStream(mobyDick)) {

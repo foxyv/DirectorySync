@@ -3,22 +3,47 @@ package test;
 import ninja.foxyv.vsync.entities.DirectoryFingerprint;
 import ninja.foxyv.vsync.entities.FileFingerprint;
 import ninja.foxyv.vsync.utils.DirectorySyncUtils;
+import ninja.foxyv.vsync.utils.ReactiveFileUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Mono;
 import reactor.core.publisher.Timed;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.security.MessageDigest;
+import java.nio.file.Files;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
+import java.util.List;
+import java.util.zip.CRC32C;
+import java.util.zip.Checksum;
 
 import static test.utils.TmpDirectoryUtils.prepareTMPDirectory;
 
 public class TestDirectorySyncUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TestDirectorySyncUtils.class);
+
+    @Test
+    public void testFileList() throws IOException {
+        File tmp = new File("tmp");
+        prepareTMPDirectory(tmp);
+        File testDir = new File(tmp, "test");
+        testDir.mkdirs();
+        File testFile = new File(testDir, "test.txt");
+        Files.writeString(testFile.toPath(), "Rawr");
+
+        List<File> files = ReactiveFileUtils.listFiles(tmp, true).collectList().switchIfEmpty(Mono.just(Collections.emptyList())).block();
+        Assertions.assertNotNull(files);
+        Assertions.assertFalse(files.isEmpty());
+        files.stream().map(File::getAbsolutePath).forEach(System.out::println);
+        Assertions.assertTrue(files.contains(testFile));
+        List<File> filesNonRecursive = ReactiveFileUtils.listFiles(tmp, false).collectList().switchIfEmpty(Mono.just(Collections.emptyList())).block();
+        Assertions.assertFalse(filesNonRecursive.contains(testFile));
+
+    }
 
     @Test
     public void testFingerprintDirectory() {
@@ -51,29 +76,29 @@ public class TestDirectorySyncUtils {
 
         FileFingerprint fingerprint = result.get();
 
-        byte[] sha256 = sha256(mobyDick);
+        Checksum crc32c = crc32c(mobyDick);
 
         Assertions.assertNotNull(fingerprint);
         Assertions.assertEquals(mobyDick.length(), fingerprint.length());
-        Assertions.assertArrayEquals(sha256, fingerprint.sha256().value());
+        Assertions.assertEquals(crc32c.getValue(), fingerprint.checksum().getValue());
 
         LOG.info("Fingerprinted " + result.get().length() + " bytes in " + result.elapsed().toMillis() + " milliseconds and " + result.elapsed().toNanosPart() + " nanos.");
 
         FileFingerprint fingerprint2 = DirectorySyncUtils.fingerprintFile(mobyDick, 1024).block();
         Assertions.assertNotNull(fingerprint2);
         Assertions.assertEquals(fingerprint.length(), fingerprint2.length());
-        Assertions.assertArrayEquals(fingerprint.sha256().value(), fingerprint2.sha256().value());
+        Assertions.assertEquals(fingerprint.checksum().getValue(), fingerprint2.checksum().getValue());
     }
 
-    private byte[] sha256(File mobyDick) throws NoSuchAlgorithmException {
-        MessageDigest sha1 = MessageDigest.getInstance("SHA-256");
+    private Checksum crc32c(File mobyDick) throws NoSuchAlgorithmException {
+        Checksum crc32c = new CRC32C();
         try(FileInputStream fis = new FileInputStream(mobyDick)) {
             int numRead;
             byte[] buffer = new byte[1024];
             while((numRead = fis.read(buffer)) != -1) {
-                sha1.update(buffer, 0, numRead);
+                crc32c.update(buffer, 0, numRead);
             }
-            return sha1.digest();
+            return crc32c;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
